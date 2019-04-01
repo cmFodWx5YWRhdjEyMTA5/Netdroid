@@ -5,13 +5,17 @@ package org.pctechtips.netdroid;
 * */
 
 import android.content.ActivityNotFoundException;
+import android.content.Context;
 import android.content.Intent;
+import android.net.ConnectivityManager;
 import android.net.DhcpInfo;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.net.wifi.SupplicantState;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.support.v7.app.AppCompatActivity;
@@ -75,6 +79,8 @@ public class MainActivity extends AppCompatActivity {
     private ListView localNetListView;
     private org.pctechtips.netdroid.HostAdapter localNetAdapter;
     private ImageView scanButton;
+    private ConnectivityManager cm;
+    private NetworkInfo info;
 
 
     @Override
@@ -100,52 +106,58 @@ public class MainActivity extends AppCompatActivity {
         ImgWifiIcon = (ImageView) findViewById(org.pctechtips.netdroid.R.id.wifi_icon_id);
         progressBar = (ProgressBar) findViewById(org.pctechtips.netdroid.R.id.progress_bar);
         txtWifiName = (TextView) findViewById(org.pctechtips.netdroid.R.id.wifi_name);
-        scanButton = (ImageView) findViewById(R.id.scan_button);
+        //scanButton = (ImageView) findViewById(R.id.scan_button);
 
 
         linearWifiName = (LinearLayout) findViewById(org.pctechtips.netdroid.R.id.linear_wifi_name);
         //referencing LinearLayout in activity_main.xml for popup window
         linearMain = (LinearLayout) findViewById(org.pctechtips.netdroid.R.id.linearLayout_main);
 
-        /* getting wifi information */
-        wifiMan = (WifiManager) this.getApplicationContext().getSystemService(WIFI_SERVICE);
+        cm = (ConnectivityManager) getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        info = cm.getActiveNetworkInfo();
+        if (info != null && info.isConnected()) {
+            txtWifiName.setText(info.getExtraInfo().replace("\"", "").toUpperCase());
+            Log.v("SSID", info.getExtraInfo());
+        }
+
+        wifiMan = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
         wifiInfo = wifiMan.getConnectionInfo();
+        Log.v("WIFIINFO:", wifiInfo.getSSID());
         dhcpInfo = wifiMan.getDhcpInfo();
 
-        /*getting IPv4 private network */
-//        getIpToString();
+
+        Log.v("android ver", getAndroidVersion());
 
         /*getting subnet mask private net*/
         getNetInterfaceCfg();
+
+        taskPublicNet = new TaskPublicNet();
+        taskPublicNet.execute();
 
         //inflating adapter
         localNetListView  = (ListView) findViewById(R.id.local_network);
         localNetAdapter = new org.pctechtips.netdroid.HostAdapter(this, R.layout.list_main, localIfaceInfo);
         localNetListView.setAdapter(localNetAdapter);
 
-
         /*
-        * if wifi adapter is not enabled or phone not connected to wifi
-        * change wifi image icon to no connection. and display message
-        */
-        if (!wifiMan.isWifiEnabled() || !wifiInfo.getSupplicantState().equals(SupplicantState.COMPLETED)) {
-            txtWifiName.setText("CONNECT TO WIFI");
-            //setting no connection icon and intent to wifi list in Android settings
-            ImgWifiIcon.setImageResource(org.pctechtips.netdroid.R.drawable.ic_signal_wifi_off_white_36dp);
-        }
-        else {
+         * if wifi adapter is not enabled or phone not connected to wifi
+         * change wifi image icon to no connection. and display message
+         */
+        /*if (wifiMan.isWifiEnabled() || wifiInfo.getSupplicantState().equals(SupplicantState.COMPLETED)) {
             //setting wifi name to access point name
             txtWifiName.setText(wifiInfo.getSSID().replace("\"", "").toUpperCase());
         }
-
-        taskPublicNet = new TaskPublicNet();
-        taskPublicNet.execute();
+        else {
+            txtWifiName.setText("CONNECT TO WIFI");
+            //setting no connection icon and intent to wifi list in Android settings
+            ImgWifiIcon.setImageResource(org.pctechtips.netdroid.R.drawable.ic_signal_wifi_off_white_36dp);
+        }*/
 
         /*
         * listener for LinearLayout WifiName: create intent depending of wifi connection state
         * if wifi is connected to AccessPoint then scan, if not send user to connect first!
         */
-        scanButton.setOnClickListener(new View.OnClickListener() {
+        /*scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if(wifiInfo.getSupplicantState().equals(SupplicantState.COMPLETED)) {
@@ -158,7 +170,7 @@ public class MainActivity extends AppCompatActivity {
                     startActivity(new Intent(Settings.ACTION_WIFI_SETTINGS));
                 }
             }
-        });
+        });*/
     }
 
     /*
@@ -210,6 +222,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * method to get android software version information
+     * @return sdkVersion, release
+     */
+    public String getAndroidVersion() {
+        String release = Build.VERSION.RELEASE;
+        int sdkVersion = Build.VERSION.SDK_INT;
+        return sdkVersion + " (" + release +")";
+    }
+
 
     /*
     * This AsyncTask needs to run in background.
@@ -231,12 +253,15 @@ public class MainActivity extends AppCompatActivity {
 
             /* populating localIfaceInfo array with local
             * ip and wifi information */
+            Log.v("WIFI:", wifiInfo.getBSSID() +" "+ wifiInfo.getSSID());
             localIfaceInfo.add("DNS: " + getIpToString(dhcpInfo.dns1));
             localIfaceInfo.add("Gateway: " + getIpToString(dhcpInfo.gateway));
-            localIfaceInfo.add("SSID: " + wifiInfo.getSSID().replace("\"", ""));
-            localIfaceInfo.add("BSSID: " + wifiInfo.getBSSID());
             localIfaceInfo.add("Signal: " + wifiInfo.getRssi() + "db");
             localIfaceInfo.add("Speed: " + wifiInfo.getLinkSpeed() + "Mbps");
+            localIfaceInfo.add("SSID: " + info.getExtraInfo().replace("\"", ""));
+            localIfaceInfo.add("BSSID: " + wifiInfo.getBSSID());
+
+
 
         }
 
@@ -290,6 +315,7 @@ public class MainActivity extends AppCompatActivity {
 //                String state = jo.get("region").toString().replaceAll(strRegex, "");
                 String hostname = jo.get("hostname").toString().replaceAll(strRegex, "");
                 Log.v("PUBLIC ", publicIp +" "+city+" "+country);
+                publishProgress("Public Network")
                 publishProgress("PublicIp: "+publicIp);
                 publishProgress("Hostname: "+hostname);
                 publishProgress("City: "+city);

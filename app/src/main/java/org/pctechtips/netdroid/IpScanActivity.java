@@ -31,6 +31,7 @@ import java.io.BufferedReader;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStreamReader;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.Executor;
@@ -240,6 +241,7 @@ public class IpScanActivity extends AppCompatActivity {
         org.pctechtips.netdroid.IpScanRunnable[] task = new org.pctechtips.netdroid.IpScanRunnable[NUMTHREADS];
 //        Thread[] thread = new Thread[NUMTHREADS];
         ExecutorService executor = Executors.newFixedThreadPool(NUMTHREADS);
+        InetAddress ia;
 
 
         @Override
@@ -276,14 +278,8 @@ public class IpScanActivity extends AppCompatActivity {
 
         @Override
         protected void onProgressUpdate(Void... params) {
-        //protected void onProgressUpdate(Node... values) {
-            //only add to ArrayList<Node> if host is alive on network
-            /*if(values[0].ip != null) {
-                hostList.add(values[0]);
-                networkAdapter.notifyDataSetInvalidated();
-            }
             //update progress bar
-            scanProgress.setProgress(values[0].progressBar);*/
+            /*scanProgress.setProgress(values[0].progressBar);*/
             try {
 
                 BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(ARP_TABLE), "UTF-8"));
@@ -291,16 +287,19 @@ public class IpScanActivity extends AppCompatActivity {
                 String line;
 
                 while ((line = reader.readLine()) != null) {
+                    Log.v("ARPFILE", line);
                     String[] arpLine = line.split("\\s+");
                     //if arp line contains flag 0x2 we parse host
                     if(arpLine[2].equals(ARP_FLAG)) {
                         final String ip = arpLine[0];
                         final String flag = arpLine[2];
                         final String mac = arpLine[3];
-                        Log.v("PARSED", ip +" "+flag+" "+mac);
+//                        ia = InetAddress.getByName(ip);
+//                        Log.v("PARSED", ip +" "+flag+" "+mac + " "+ ia.getCanonicalHostName());
                         Node node = new Node(ip, mac);
                         hostList.add(node);
                         networkAdapter.notifyDataSetInvalidated();
+//                        scanProgress.setProgress(node.progressBar);
                     }
                 }
             }
